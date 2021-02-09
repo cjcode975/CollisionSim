@@ -1,16 +1,14 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package Boundaries;
 
 import Physics.Matrix;
 import Physics.Vector;
 
 /**
- *
- * @author My Laptop
+ * Class defining a general boundary for the simulation with methods to detect balls
+ * hitting it, when they hit it, and how they bounce off. Specific boundary
+ * shapes can be defined as subclasses.
+ * 
+ * @author cjcode975
  */
 public abstract class Boundary {
     
@@ -30,7 +28,7 @@ public abstract class Boundary {
      * @param loc position on boundary
      * @return normal vector for the surface
      */
-    public abstract Vector Normal(Vector loc, double radius);
+    public abstract Vector Normal(Vector loc);
     
     /**
      * Check if a ball is outside bounds or in contact with the boundary wall 
@@ -55,13 +53,14 @@ public abstract class Boundary {
         double dt = Rewind_Time(loc,vel,radius);
         if(dt<0){
             throw new IllegalStateException("Rewind time calculated as negative");
-        }        
-        
-        //Calculate velocity after reflection
-        Vector normal = Normal(loc,radius);
-        Vector parallel = normal.scale(vel.dot(normal));
+        }    
         
         Vector loc_prime = loc.sub(vel.scale(dt));
+        
+        //Calculate velocity after reflection
+        Vector normal = Normal(loc_prime);
+        Vector parallel = normal.scale(vel.dot(normal));       
+        
         Vector vel_prime = vel.sub(parallel.scale(2));
         loc_prime = loc_prime.add(vel_prime.scale(dt));
         

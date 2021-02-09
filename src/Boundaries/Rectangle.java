@@ -1,18 +1,16 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+
 package Boundaries;
 
 import Physics.Vector;
 import std.StdDraw;
 
 /**
- *
- * @author My Laptop
+ * Class describing the rectangular boundary problem for a billiard
+ * @author cjcode975
  */
 public class Rectangle extends Boundary{
+    
+    private boolean clw, crw, cbw, ctw;
     
     /**
      * Initialise a boundary rectangle that has dimension width x height
@@ -24,13 +22,6 @@ public class Rectangle extends Boundary{
         bounds[3] = height;
     }
 
-    /**
-     *
-     * @param loc
-     * @param vel
-     * @param radius
-     * @return
-     */
     @Override
     public double Rewind_Time(Vector loc, Vector vel, double radius){
         if(loc.get(0)<radius){ //left wall
@@ -45,51 +36,37 @@ public class Rectangle extends Boundary{
         else{ //top wall
             return (radius-bounds[3]+loc.get(1))/vel.get(1);
         }
-    }
+    }    
     
-    /**
-     * Get the Vector normal to the surface of the boundary at a point
-     * @param loc position on boundary
-     * @param radius
-     * @return normal vector for the surface
-     */
     @Override
-    public Vector Normal(Vector loc, double radius) {
+    public Vector Normal(Vector loc) {
         double normal[] = new double[2];
         
-        if(loc.get(0)<radius){
+        if(clw){
             normal[0] = 1;
         }
-        else if(loc.get(0)>bounds[1]-radius){
+        else if(crw){
             normal[0]=-1;
         }
         
-        if(loc.get(1)<radius){
+        if(cbw){
             normal[1] = 1;            
         }
-        else if(loc.get(1)>bounds[3]-radius){
+        else if(ctw){
             normal[1] = -1;
         }
         return (new Vector(normal)).unit();
     }
-
-    /**
-     * Check if a ball is outside bounds or in contact with the boundary wall 
-     * @param loc centre of the ball
-     * @param radius radius of the ball
-     * @return if the boundary is breached
-     */
+    
     @Override
     public boolean OutOfBounds(Vector loc, double radius) {
-        if(loc.get(0)<radius || loc.get(0)>bounds[1]-radius || loc.get(1)<radius || loc.get(1)>bounds[3]-radius){
-            return true;
-        }
-        return false;
+        clw = loc.get(0)<radius;
+        crw = (bounds[1]-loc.get(0))<radius;
+        cbw = loc.get(1)<radius;
+        ctw = (bounds[3]-loc.get(1))<radius;
+        return clw | crw | cbw | ctw;
     }
 
-    /**
-     * Draw the boundary
-     */
     @Override
     public void Draw() {
         StdDraw.rectangle(bounds[1]/2.0, bounds[3]/2.0, bounds[1]/2.0, bounds[3]/2.0);
