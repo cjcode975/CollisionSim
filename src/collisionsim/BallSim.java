@@ -19,9 +19,9 @@ import java.util.Random;
  * 
  * @author cjcode975
  */
-public class Ball_Sim {
+public class BallSim {
     
-    private final int nballs;
+    private final int n_balls;
     
     private Matrix loc, vel;
     
@@ -41,8 +41,8 @@ public class Ball_Sim {
      * @param Max_X width of box
      * @param Max_Y height of box
      */
-    public Ball_Sim(int N_Balls, Boundary boundary){
-        nballs = N_Balls;
+    public BallSim(int N_Balls, Boundary boundary){
+        n_balls = N_Balls;
         bounds = boundary;
         
         bounding_box = bounds.getBounds();
@@ -58,7 +58,7 @@ public class Ball_Sim {
      * @param radius_val constant radius
      */
     public void Set_Radii(double radius_val){
-        radius = new double[nballs];
+        radius = new double[n_balls];
         Arrays.fill(radius, radius_val);
     }
     
@@ -68,8 +68,8 @@ public class Ball_Sim {
      * @param max maximum possible radii
      */
     public void Set_Radii(double min, double max){
-        radius = new double[nballs];
-        for(int i=0; i<nballs; i++){
+        radius = new double[n_balls];
+        for(int i=0; i<n_balls; i++){
             radius[i] = min+(max-min)*rand.nextDouble();
         }        
         
@@ -83,12 +83,12 @@ public class Ball_Sim {
      * @param mass_val either mass of each ball, or density
      */
     public void Set_Mass(boolean Same_Mass, double mass_val){
-        mass = new double[nballs];
+        mass = new double[n_balls];
         if(Same_Mass){
             Arrays.fill(mass,mass_val);
             return;
         }
-        for(int i=0; i<nballs; i++){
+        for(int i=0; i<n_balls; i++){
             mass[i] = 4.0*Math.PI*Math.pow(radius[i], 3)*mass_val/3.0;
         }
     }
@@ -98,9 +98,9 @@ public class Ball_Sim {
      * don't overlap with each other or the walls
      */
     public void Set_Locations(){
-        loc = new Matrix(2,nballs);
+        loc = new Matrix(2,n_balls);
         
-        for(int i=0; i<nballs; i++){            
+        for(int i=0; i<n_balls; i++){            
             do{
                 loc.set(0, i, bounding_box[0]+(bounding_box[1]-bounding_box[0])*rand.nextDouble());
                 loc.set(1, i, bounding_box[2]+(bounding_box[3]-bounding_box[2])*rand.nextDouble());
@@ -132,9 +132,9 @@ public class Ball_Sim {
      * @param speed speed for all balls
      */
     public void Set_Speed(double speed){
-        vel = new Matrix(2,nballs);
+        vel = new Matrix(2,n_balls);
         
-        for(int i=0; i<nballs; i++){
+        for(int i=0; i<n_balls; i++){
             double angle = 2*Math.PI*rand.nextDouble();
             vel.set(0,i, speed*Math.cos(angle));
             vel.set(1,i,speed*Math.sin(angle));
@@ -146,9 +146,9 @@ public class Ball_Sim {
      * @param momentum 
      */
     public void Set_Momentum(double momentum){
-        vel = new Matrix(2,nballs);
+        vel = new Matrix(2,n_balls);
         
-        for(int i=0; i<nballs; i++){
+        for(int i=0; i<n_balls; i++){
             double angle = 2*Math.PI*rand.nextDouble();
             vel.set(0,i, momentum*Math.cos(angle)/mass[i]);
             vel.set(1,i,momentum*Math.sin(angle)/mass[i]);
@@ -177,41 +177,20 @@ public class Ball_Sim {
     public void Collisions(){        
         //Check for collisions between pairs of balls
         //TO DO: update detection based on binary space partition for speed
-        for(int i=0; i<nballs; i++){
-            for(int j=i+1; j<nballs; j++){
+        for(int i=0; i<n_balls; i++){
+            for(int j=i+1; j<n_balls; j++){
                 if(loc.column(i).sub(loc.column(j)).magnitude()<radius[i]+radius[j]){
                     
-                    //Identify when the balls actually collided
-                    Vector xdiff = loc.column(i).sub(loc.column(j));
-                    Vector vdiff = vel.column(i).sub(vel.column(j));
-                    
-                    double a = vdiff.dot(vdiff);
-                    double b = -2*xdiff.dot(vdiff);
-                    double c = xdiff.dot(xdiff)-Math.pow(radius[i]+radius[j], 2);
-                    
-                    ArrayList<Double> troots = Formulae.QuadraticRealRoots(a, b, c);
-                    double tcorrec = 0;
-                    if(troots.size()==1){
-                        tcorrec = troots.get(0);
-                    }
-                    else{
-                        if(troots.get(0)>0 && troots.get(1)>0){
-                            tcorrec = Math.min(troots.get(0), troots.get(1));
-                        }
-                        else{
-                            tcorrec = Math.max(troots.get(0), troots.get(1));
-                        }
-                    }
-                    if(tcorrec<0){
-                        throw new IllegalStateException("Correction time calculated as negative");
-                    }
+                    //Clculte when the balls actually collided
+                    double tcorrec = Formulae.whenCirclesIntersected(loc.column(i),loc.column(j),vel.column(i),vel.column(j),radius[i],radius[j]);
                     
                     //Unwind time to the collision
                     loc.setCol(i, loc.column(i).sub(vel.column(i).scale(tcorrec)));
                     loc.setCol(j, loc.column(j).sub(vel.column(j).scale(tcorrec)));
                     
                     //Calculate the effect of the collision on the velocities
-                    xdiff = loc.column(i).sub(loc.column(j));
+                    Vector xdiff = loc.column(i).sub(loc.column(j));
+                    Vector vdiff = vel.column(i).sub(vel.column(j));
                     
                     Vector inc = xdiff.scale(2*vdiff.dot(xdiff)/((mass[i]+mass[j])*xdiff.dot(xdiff)));
                     
@@ -226,7 +205,7 @@ public class Ball_Sim {
         }
         
         //Check for collisions with the walls
-        for(int i=0; i<nballs; i++){
+        for(int i=0; i<n_balls; i++){
             if(bounds.OutOfBounds(loc.column(i), radius[i])){
                 Matrix temp = bounds.Bounce(loc.column(i), vel.column(i), radius[i]);
                 loc.setCol(i, temp.column(0));
@@ -276,7 +255,7 @@ public class Ball_Sim {
         StdDraw.clear();
         StdDraw.setPenColor();
         bounds.Draw();
-        for(int i=0; i<nballs; i++){
+        for(int i=0; i<n_balls; i++){
             StdDraw.filledCircle(loc.get(0,i), loc.get(1,i), radius[i]);
         }
         //StdDraw.text(3, 1, Integer.toString(counter));
