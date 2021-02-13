@@ -85,6 +85,20 @@ public class Vector {
     }
     
     /**
+     * Parse a string list of Vector elements as a Vector
+     * @param s list of elements of a Vector
+     * @return Vector
+     */
+    public static Vector parseVector(String s){
+        String temp_vals[] = s.substring(1,s.length()-1).split(", ");
+        double output [] = new double[temp_vals.length];
+        for(int i=0; i<temp_vals.length; i++){
+            output[i] = Double.parseDouble(temp_vals[i]);
+        }
+        return new Vector(output);
+    }
+    
+    /**
      * Change the value of element at position i to j
      * @param i position in vector to change
      * @param j new value
