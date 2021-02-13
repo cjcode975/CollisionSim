@@ -65,9 +65,51 @@ public class Matrix {
      * @param input_vals 2d array of entries
      */
     public Matrix(double input_vals[][]){
-        vals = input_vals.clone();
+        vals = copy2DArray(input_vals);
         nrows = vals.length;
         ncols = vals[0].length;
+    }
+    
+    /**
+     * Copy Matrix as a new Matrix
+     * @return copied Matrix
+     */
+    @Override
+    public Matrix clone(){
+        return new Matrix(vals);
+    }
+    
+    /**
+     * Get the String description of a Matrix as a print out of all of its entries
+     * @return String of list of Matrix entries
+     */
+    @Override
+    public String toString(){
+        return Arrays.deepToString(vals);
+    }
+    
+    /**
+     * Given a String representation of a Matrix as a nested list of entries, 
+     * construct the Matrix
+     * @param s nested list of Matrix entries
+     * @return the Matrix
+     */
+    public static Matrix parseMatrix(String s){
+        String rows[] = s.substring(2, s.length()-2).split("//], //[");
+        int temp_nrows = rows.length;
+        String row[] = rows[0].split(", ");
+        int temp_ncols = row.length;
+        double temp_vals[][] = new double[temp_nrows][temp_ncols];
+        for(int i=0; i<temp_nrows; i++){
+            row = rows[i].split(", ");
+            if(row.length != temp_ncols){
+                throw new IllegalArgumentException("Number of columns is not consistent across all rows");
+            }
+            for(int j=0; j<temp_ncols; j++){
+                temp_vals[i][j] = Double.parseDouble(row[j]);
+            }
+        }
+        return new Matrix(temp_vals);
     }
     
     /**
@@ -93,16 +135,7 @@ public class Matrix {
     public String dimString(){
         return "("+nrows+","+ncols+")";
     }
-    
-    /**
-     * Matrix is represented as a list of its elements when taken as a String
-     * @return String representation of Matrix by its elements
-     */
-    @Override
-    public String toString(){
-        return Arrays.deepToString(vals);
-    }
-    
+        
     /**
      * Get the element in position i, j
      * @param i row position
@@ -297,4 +330,12 @@ public class Matrix {
         System.out.println(c.multiply(a).toString());
     }
     
+    
+    public static double[][] copy2DArray(double d[][]){
+        double output[][] = new double[d.length][d[0].length];
+        for(int i=0; i<d.length; i++){
+            output[i] = d[i].clone();
+        }
+        return output;
+    }
 }
