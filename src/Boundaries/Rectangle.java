@@ -10,7 +10,7 @@ import std.StdDraw;
  */
 public class Rectangle extends Boundary{
     
-    private boolean clw, crw, cbw, ctw;
+    private boolean coll_x, coll_y;
     
     /**
      * Initialise a boundary rectangle that has dimension width x height
@@ -18,53 +18,41 @@ public class Rectangle extends Boundary{
      * @param height height of the box
      */
     public Rectangle(double width, double height){
-        bounds[1] = width;
-        bounds[3] = height;
+        bounds[0] = -width/2;
+        bounds[1] = width/2;
+        bounds[2] = -height/2;
+        bounds[3] = height/2;
     }
 
     @Override
     public double Rewind_Time(Vector loc, Vector vel, double radius){
-        if(loc.get(0)<radius){ //left wall
-            return -1*(radius-loc.get(0))/vel.get(0);
+        if(coll_x){
+            return (radius-bounds[1]+Math.abs(loc.get(0)))/Math.abs(vel.get(0));
         }
-        else if(loc.get(0)>bounds[1]-radius){ //right wall
-            return (radius-bounds[1]+loc.get(0))/vel.get(0);
-        }
-        if(loc.get(1)<radius){ //bottom wall
-            return -1*(radius-loc.get(1))/vel.get(1);
-        }
-        else{ //top wall
-            return (radius-bounds[3]+loc.get(1))/vel.get(1);
-        }
+        
+        return (radius-bounds[3]+Math.abs(loc.get(1)))/Math.abs(vel.get(1));
     }    
     
     @Override
     public Vector Normal(Vector loc) {
         double normal[] = new double[2];
         
-        if(clw){
-            normal[0] = 1;
-        }
-        else if(crw){
-            normal[0]=-1;
+        if(coll_x){
+            normal[0] = loc.get(0)<0 ? 1 : -1;
         }
         
-        if(cbw){
-            normal[1] = 1;            
+        if(coll_y){
+            normal[1] = loc.get(1)<0 ? 1 : -1;
         }
-        else if(ctw){
-            normal[1] = -1;
-        }
+        
         return (new Vector(normal)).unit();
     }
     
     @Override
     public boolean OutOfBounds(Vector loc, double radius) {
-        clw = loc.get(0)<radius;
-        crw = (bounds[1]-loc.get(0))<radius;
-        cbw = loc.get(1)<radius;
-        ctw = (bounds[3]-loc.get(1))<radius;
-        return clw | crw | cbw | ctw;
+        coll_x = (bounds[1]-Math.abs(loc.get(0)))<radius;
+        coll_y = (bounds[3]-Math.abs(loc.get(1)))<radius;
+        return coll_x | coll_y;
     }
 
     @Override
@@ -72,5 +60,7 @@ public class Rectangle extends Boundary{
         StdDraw.rectangle(bounds[1]/2.0, bounds[3]/2.0, bounds[1]/2.0, bounds[3]/2.0);
     }
 
-    
+    public String toString(){
+        return "Rectangle, "+(2*bounds[1])+", "+(2*bounds[3]);
+    }
 }
