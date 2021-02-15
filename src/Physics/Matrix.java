@@ -95,7 +95,7 @@ public class Matrix {
      * @return the Matrix
      */
     public static Matrix parseMatrix(String s){
-        String rows[] = s.substring(2, s.length()-2).split("//], //[");
+        String rows[] = s.substring(2, s.length()-2).split("\\], \\[");
         int temp_nrows = rows.length;
         String row[] = rows[0].split(", ");
         int temp_ncols = row.length;
@@ -329,8 +329,7 @@ public class Matrix {
         System.out.println(a.sub(c).toString());
         System.out.println(c.multiply(a).toString());
     }
-    
-    
+        
     public static double[][] copy2DArray(double d[][]){
         double output[][] = new double[d.length][d[0].length];
         for(int i=0; i<d.length; i++){
