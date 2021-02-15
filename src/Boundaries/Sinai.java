@@ -96,4 +96,8 @@ public class Sinai extends Boundary{
         StdDraw.square(0, 0, size);
     }
     
+    public String toString(){
+        return "Sinai, "+rad+", "+(size*2);
+    }
+    
 }
