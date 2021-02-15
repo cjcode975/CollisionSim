@@ -42,5 +42,11 @@ public class Circle extends Boundary{
         StdDraw.circle(0, 0, rad);
     }
 
-    
+    /**
+     * Description of boundary as a String
+     * @return name of boundary type, radius
+     */
+    public String toString(){
+        return "Circle, "+rad;
+    }
 }

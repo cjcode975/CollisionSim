@@ -83,7 +83,7 @@ public class Sinai extends Boundary{
             return Formulae.whenCirclesIntersected(loc, new Vector(2), vel, new Vector(2), radius, rad);
         }
         
-        if(size-Math.abs(loc.get(0))<=radius){
+        if(coll_x){
             return (radius-size+Math.abs(loc.get(0)))/Math.abs(vel.get(0));
         }
         

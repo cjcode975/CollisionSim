@@ -96,4 +96,11 @@ public class Mushroom extends Boundary{
         StdDraw.line(rad, 0, wid, 0);
     }
     
+    /**
+     * String description of the boundary
+     * @return Boundary name, radius, stalk width, stalk height
+     */
+    public String toString(){
+        return "Mushroom, "+rad+", "+(2*wid)+", "+height;
+    }
 }

@@ -12,6 +12,49 @@ import Physics.Vector;
  */
 public abstract class Boundary {
     
+    /**
+     * Given a String describing a boundary, identify the boundary type and 
+     * its specifications, and reconstruct the boundary
+     * @param s Name of boundary and all dimensions
+     * @return reconstructed boundary
+     */
+    public static Boundary parseBoundary(String s){
+        String args[] = s.split(", ");
+        switch(args[0]){
+            case "Circle":
+                if(args.length!=2){
+                    throw new IllegalArgumentException("Wrong number of specifications made on boundary");
+                }
+                return new Circle(Double.parseDouble(args[1]));
+            case "Dispersive":
+                if(args.length!=2){
+                    throw new IllegalArgumentException("Wrong number of specifications made on boundary");
+                }
+                return new Dispersive(Double.parseDouble(args[1]));
+            case "Mushroom":
+                if(args.length!=4){
+                    throw new IllegalArgumentException("Wrong number of specifications made on boundary");
+                }
+                return new Mushroom(Double.parseDouble(args[1]),Double.parseDouble(args[2]),Double.parseDouble(args[3]));
+            case "Rectangle":
+                if(args.length!=3){
+                    throw new IllegalArgumentException("Wrong number of specifications made on boundary");
+                }
+                return new Rectangle(Double.parseDouble(args[1]),Double.parseDouble(args[2]));
+            case "Sinai":
+                if(args.length!=3){
+                    throw new IllegalArgumentException("Wrong number of specifications made on boundary");
+                }
+                return new Sinai(Double.parseDouble(args[1]),Double.parseDouble(args[2]));
+            case "Stadium":
+                if(args.length!=3){
+                    throw new IllegalArgumentException("Wrong number of specifications made on boundary");
+                }
+                return new Stadium(Double.parseDouble(args[1]),Double.parseDouble(args[2]));
+        }
+        throw new IllegalArgumentException("Unsupported boundary type");
+    }
+    
     //Store a bounding box for the boundary - x_min, x_max, y_min, y_max
     double bounds[] = new double[4];
     

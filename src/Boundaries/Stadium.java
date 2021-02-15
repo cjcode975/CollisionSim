@@ -81,4 +81,12 @@ public class Stadium extends Boundary{
         StdDraw.line(-wid, rad, wid, rad);
         StdDraw.line(-wid, -rad, wid, -rad);
     }
+    
+    /**
+     * Describe the boundary as a String
+     * @return 
+     */
+    public String toString(){
+        return "Stadium, "+rad+", "+(2*wid);
+    }
 }

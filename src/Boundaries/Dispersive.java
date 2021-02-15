@@ -59,4 +59,12 @@ public class Dispersive extends Boundary {
         StdDraw.arc(-rad, rad, rad, 270, 360);
     }
     
+    /**
+     * String description of boundary
+     * @return boundary type name, radius
+     */
+    public String toString(){
+        return "Dispersive, "+rad;
+    }
+    
 }
