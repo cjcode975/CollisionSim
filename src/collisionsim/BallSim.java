@@ -14,6 +14,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Random;
 
 /**
@@ -27,19 +28,35 @@ import java.util.Random;
  */
 public class BallSim {
     
+    //Primary simulation variables
     private final int n_balls;
     
     private Matrix loc, vel;
     
     private double[] radius, mass;
-    private double max_radius;
-        
-    private Boundary bounds;
-    private double bounding_box[];
+    private double max_radius;   
     
     private double dt;
     
+    //Description of the boundary of billiard    
+    private Boundary bounds;
+    private double bounding_box[];
+    
+    //Variables used to describe the partition of the billiard into subspaces to
+    //speed up collision detection
+    private ArrayList<Integer>[][] partitionBoxes;
+    private int nbox_x, nbox_y;
+    private Vector partitionCorner = new Vector(2);    
+    
+    //Information needed for saving data
     private String baseFileName;
+    
+    //Momentum distribution information
+    private double maxMomDist,momDistBoxWidth;
+    private int nMomBoxes = 75;
+    
+    //Radial velocity information
+    private int nRadBoxes = 75;
     
     private Random rand = new Random(System.currentTimeMillis());
     
@@ -67,6 +84,14 @@ public class BallSim {
      */
     public void Set_Radii(double vals[]){
         radius = vals.clone();
+        
+        max_radius = radius[0];
+        
+        for(int i=1; i<n_balls; i++){
+            if(radius[i]>max_radius){ max_radius=radius[i]; }            
+        }
+        
+        CollisionBoxes();
     }
     
     /**
@@ -76,7 +101,11 @@ public class BallSim {
     public void Set_Radii(double radius_val){
         radius = new double[n_balls];
         Arrays.fill(radius, radius_val);
-    }
+        
+        max_radius = radius_val;
+        CollisionBoxes();
+    }   
+    
     
     /**
      * Set radii of the balls, drawn uniformly from the range [min,max)
@@ -85,10 +114,40 @@ public class BallSim {
      */
     public void Set_Radii(double min, double max){
         radius = new double[n_balls];
+        max_radius = 0;
         for(int i=0; i<n_balls; i++){
             radius[i] = min+(max-min)*rand.nextDouble();
+            if(radius[i]>max_radius){
+                max_radius = radius[i];
+            }
         }        
         
+        CollisionBoxes();
+    }
+    
+    /**
+     * Setup the binary space partition used to detect ball-to-ball collisions
+     */
+    private void CollisionBoxes(){
+        
+        max_radius = 2.25*max_radius;
+        
+        int zero_box_x = (int)(Math.ceil(-1*(bounding_box[0]-1)/max_radius));
+        int zero_box_y = (int)(Math.ceil(-1*(bounding_box[2]-1)/max_radius));
+        
+        nbox_x = (int)(Math.ceil((bounding_box[1]+1)/max_radius))+zero_box_x;
+        nbox_y = (int)(Math.ceil((bounding_box[3]+1)/max_radius))+zero_box_y;
+        
+        partitionCorner.set(0, -1*max_radius*zero_box_x);
+        partitionCorner.set(1, -1*max_radius*zero_box_y);
+        
+        partitionBoxes = new ArrayList[nbox_x][nbox_y];        
+        
+        for(int i=0; i<nbox_x; i++){
+            for(int j=0; j<nbox_y; j++){
+                partitionBoxes[i][j] = new ArrayList<Integer>();
+            }
+        }       
     }
     
     /**
@@ -136,8 +195,22 @@ public class BallSim {
             do{
                 loc.set(0, i, bounding_box[0]+(bounding_box[1]-bounding_box[0])*rand.nextDouble());
                 loc.set(1, i, bounding_box[2]+(bounding_box[3]-bounding_box[2])*rand.nextDouble());
-            }while(bounds.OutOfBounds(loc.column(i), radius[i]));
+            }while(bounds.OutOfBounds(loc.column(i), radius[i]) || OverlapsPrevious(i));
         }
+    }
+    
+    /**
+     * Check if a suggested ball position overlaps with a previously placed ball
+     * @param i number of ball being placed
+     * @return if there is an overlap
+     */
+    private boolean OverlapsPrevious(int i){
+        for(int j=0; j<i; j++){
+            if(loc.column(j).sub(loc.column(i)).magnitude()<=radius[i]+radius[j]){
+                return true;
+            }
+        }
+        return false;
     }
     
     /**
@@ -146,6 +219,7 @@ public class BallSim {
      */
     public void Set_Velocities(Matrix vals){
         vel = vals.clone();
+        setMomDistMax();     
     }
         
     /**
@@ -160,6 +234,8 @@ public class BallSim {
             vel.set(0,i, speed*Math.cos(angle));
             vel.set(1,i,speed*Math.sin(angle));
         }
+        
+        setMomDistMax();
     }
     
     /**
@@ -174,6 +250,17 @@ public class BallSim {
             vel.set(0,i, momentum*Math.cos(angle)/mass[i]);
             vel.set(1,i,momentum*Math.sin(angle)/mass[i]);
         }
+        
+        setMomDistMax();
+    }
+    
+    private void setMomDistMax(){
+        double totMom = 0;
+        for(int i=0; i<n_balls; i++){
+            totMom += vel.column(i).magnitude()*mass[i];
+        }
+        maxMomDist = 3*totMom/n_balls;
+        momDistBoxWidth = maxMomDist/(double)nMomBoxes;
     }
     
     /**
@@ -192,6 +279,39 @@ public class BallSim {
     }
     
     /**
+     * Calculate and set the new velocities, and corrected positions for two
+     * balls which have collided
+     * @param i index of first ball
+     * @param j index of second ball
+     */
+    private void Collide(int i, int j){        
+        //Calculate when the balls actually collided
+        double tcorrec = 0;
+        try{
+            tcorrec = Formulae.whenCirclesIntersected(loc.column(i),loc.column(j),vel.column(i),vel.column(j),radius[i],radius[j]);
+        }
+        catch(Exception e){
+            return;
+        }
+        //Unwind time to the collision
+        loc.setCol(i, loc.column(i).sub(vel.column(i).scale(tcorrec)));
+        loc.setCol(j, loc.column(j).sub(vel.column(j).scale(tcorrec)));
+
+        //Calculate the effect of the collision on the velocities
+        Vector xdiff = loc.column(i).sub(loc.column(j));
+        Vector vdiff = vel.column(i).sub(vel.column(j));
+
+        Vector inc = xdiff.scale(2*vdiff.dot(xdiff)/((mass[i]+mass[j])*xdiff.dot(xdiff)));
+
+        vel.setCol(i, vel.column(i).sub(inc.scale(mass[j])));
+        vel.setCol(j, vel.column(j).add(inc.scale(mass[i])));
+
+        //Evolve back to the end of the timestep
+        loc.setCol(i, loc.column(i).add(vel.column(i).scale(tcorrec)));
+        loc.setCol(j, loc.column(j).add(vel.column(j).scale(tcorrec)));
+    }
+    
+    /**
      * Check for collisions between balls and walls and each other. Update
      * ball velocities according to elastic collision rules when they occur
      */
@@ -200,27 +320,8 @@ public class BallSim {
         //TO DO: update detection based on binary space partition for speed
         for(int i=0; i<n_balls; i++){
             for(int j=i+1; j<n_balls; j++){
-                if(loc.column(i).sub(loc.column(j)).magnitude()<radius[i]+radius[j]){
-                    
-                    //Clculte when the balls actually collided
-                    double tcorrec = Formulae.whenCirclesIntersected(loc.column(i),loc.column(j),vel.column(i),vel.column(j),radius[i],radius[j]);
-                    
-                    //Unwind time to the collision
-                    loc.setCol(i, loc.column(i).sub(vel.column(i).scale(tcorrec)));
-                    loc.setCol(j, loc.column(j).sub(vel.column(j).scale(tcorrec)));
-                    
-                    //Calculate the effect of the collision on the velocities
-                    Vector xdiff = loc.column(i).sub(loc.column(j));
-                    Vector vdiff = vel.column(i).sub(vel.column(j));
-                    
-                    Vector inc = xdiff.scale(2*vdiff.dot(xdiff)/((mass[i]+mass[j])*xdiff.dot(xdiff)));
-                    
-                    vel.setCol(i, vel.column(i).sub(inc.scale(mass[j])));
-                    vel.setCol(j, vel.column(j).add(inc.scale(mass[i])));
-                    
-                    //Evolve back to the end of the timestep
-                    loc.setCol(i, loc.column(i).add(vel.column(i).scale(tcorrec)));
-                    loc.setCol(j, loc.column(j).add(vel.column(j).scale(tcorrec)));
+                if(loc.column(i).sub(loc.column(j)).magnitude()<radius[i]+radius[j]){                    
+                    Collide(i,j);
                 }
             }
         }
@@ -228,13 +329,90 @@ public class BallSim {
         //Check for collisions with the walls
         for(int i=0; i<n_balls; i++){
             if(bounds.OutOfBounds(loc.column(i), radius[i])){
-                Matrix temp = bounds.Bounce(loc.column(i), vel.column(i), radius[i]);
-                loc.setCol(i, temp.column(0));
-                vel.setCol(i, temp.column(1));
+                try{
+                    Matrix temp = bounds.Bounce(loc.column(i), vel.column(i), radius[i]);
+                    loc.setCol(i, temp.column(0));
+                    vel.setCol(i, temp.column(1));
+                }catch(Exception e){}
             }
         }
     }
     
+    /**
+     * Check for collisions between balls and walls and each other. Update
+ ball velocities according to elastic collision rules when they occur
+ 
+ Uses a binary space partition for calculations - the full billiard is
+ split into partitionBoxes slightly larger than a ball. This means balls can only 
+ collide with those in adjacent partitionBoxes, meaning that the length of 
+ needed nested loop to check for collisions is much shorter
+     */
+    public void CollisionsBSP(){        
+        
+        //Clear all the lists of which balls are in each bounding box
+        for(int i=0; i<nbox_x; i++){
+            for(int j=0; j<nbox_y; j++){
+                partitionBoxes[i][j].clear();
+            }
+        }
+        
+        //Calculate which bounding box balls are inside
+        for(int i=0; i<n_balls; i++){
+            Vector rel_pos_to_corner = loc.column(i).sub(partitionCorner);
+            int box_x = (int)(rel_pos_to_corner.get(0)/max_radius);
+            int box_y = (int)(rel_pos_to_corner.get(1)/max_radius);
+            partitionBoxes[box_x][box_y].add(i);
+        }
+             
+        //Loop over the partitionBoxes to start looking for collisions
+        for(int i=0; i<nbox_x; i++){
+            for(int j=0; j<nbox_y; j++){
+                
+                if(partitionBoxes[i][j].isEmpty()){
+                    continue;
+                }
+                                
+                for(int p=0; p<partitionBoxes[i][j].size(); p++){ //loop over particles in the current box
+                    
+                    int ball_p = partitionBoxes[i][j].get(p);
+                
+                    for(int m=-1; m<=1; m++){ //loop over adjacent partitionBoxes
+                        for(int n=-1; n<=1; n++){
+                            
+                            if(i+m<0 || j+n<0 || i+m>=nbox_x || j+n>=nbox_y){
+                                continue;
+                            }
+                            
+                            for(int q=0; q<partitionBoxes[i+m][j+n].size(); q++){ //loop over balls in adjacent partitionBoxes
+                                
+                                int ball_q = partitionBoxes[i+m][j+n].get(q);
+                                
+                                //Order collisions by ball number to prevent repeat calculations and check for collision
+                                if(ball_q>=ball_p || loc.column(ball_p).sub(loc.column(ball_q)).magnitude() > radius[ball_p]+radius[ball_q]){
+                                    continue;
+                                }
+                                
+                                Collide(ball_p,ball_q);
+                                
+                            }
+                        }
+                    }
+                }
+            }
+        }
+                
+        //Check for collisions with the walls
+        for(int i=0; i<n_balls; i++){
+            if(bounds.OutOfBounds(loc.column(i), radius[i])){
+                try{
+                    Matrix temp = bounds.Bounce(loc.column(i), vel.column(i), radius[i]);
+                    loc.setCol(i, temp.column(0));
+                    vel.setCol(i, temp.column(1));
+                }catch(Exception e){}
+            }
+        }
+    } 
+   
     /**
      * Run the simulation for the given length of time
      * @param nSteps number of steps to simulate
@@ -242,10 +420,37 @@ public class BallSim {
     public void Simulate(int nSteps){
         for(int i=0; i<nSteps; i++){
             Step_Time();
-            Collisions();
+            CollisionsBSP();
             Draw();
         }
     }
+    
+    /**
+     * Get the distribution of the momenta of the balls
+     * @return histogram of the momentum distribution
+     */
+    public int[] momentumSplit(){
+        int hist [] = new int[nMomBoxes];
+        for(int i=0; i<n_balls; i++){
+            hist[(int)((vel.column(i).magnitude()*mass[i])/momDistBoxWidth)] ++;
+        }
+        return hist;
+    }
+    
+    /**
+     * Measure how rotational the particle velocities are. 1 is entirely rotational
+     * and 0 is entirely radial
+     * @return 
+     */
+    public int[] radialVelocityDist(){
+        int hist[] = new int[nRadBoxes];
+        for(int i=0; i<n_balls; i++){
+            hist[(int)((1-Math.abs(loc.column(i).unit().dot(vel.column(i).unit())))*nRadBoxes)]++;
+        }
+        return hist;
+    }
+    
+    
     
     /**
      * Get the locations of all balls
@@ -279,6 +484,7 @@ public class BallSim {
         }
         //StdDraw.text(3, 1, Integer.toString(counter));
         counter++;
+                
         StdDraw.show();
         StdDraw.pause(20);
     }
